@@ -151,7 +151,7 @@ def parse_prompt_attention(text):
     for pos in square_brackets:
         multiply_range(pos, square_bracket_multiplier)
 
-    if len(res) == 0:
+    if not res:
         res = [["", 1.0]]
 
     # merge runs of identical weights
@@ -253,7 +253,7 @@ def get_unweighted_text_embeddings(
                 text_input_chunk[:, -1] = text_input[0, -1]
             else:  # v2
                 for j in range(len(text_input_chunk)):
-                    if text_input_chunk[j, -1] != eos and text_input_chunk[j, -1] != pad:  # 最後に普通の文字がある
+                    if text_input_chunk[j, -1] not in [eos, pad]:  # 最後に普通の文字がある
                         text_input_chunk[j, -1] = eos
                     if text_input_chunk[j, 1] == pad:  # BOSだけであとはPAD
                         text_input_chunk[j, 1] = eos
@@ -277,15 +277,13 @@ def get_unweighted_text_embeddings(
                     text_embedding = text_embedding[:, 1:-1]
 
             text_embeddings.append(text_embedding)
-        text_embeddings = torch.concat(text_embeddings, axis=1)
+        return torch.concat(text_embeddings, axis=1)
+    elif clip_skip is None or clip_skip == 1:
+        return text_encoder(text_input)[0]
     else:
-        if clip_skip is None or clip_skip == 1:
-            text_embeddings = text_encoder(text_input)[0]
-        else:
-            enc_out = text_encoder(text_input, output_hidden_states=True, return_dict=True)
-            text_embeddings = enc_out["hidden_states"][-clip_skip]
-            text_embeddings = text_encoder.text_model.final_layer_norm(text_embeddings)
-    return text_embeddings
+        enc_out = text_encoder(text_input, output_hidden_states=True, return_dict=True)
+        text_embeddings = enc_out["hidden_states"][-clip_skip]
+        return text_encoder.text_model.final_layer_norm(text_embeddings)
 
 
 def get_weighted_text_embeddings(
@@ -324,7 +322,7 @@ def get_weighted_text_embeddings(
     prompt_tokens, prompt_weights = get_prompts_with_weights(tokenizer, prompt, max_length - 2)
 
     # round up the longest length of tokens to a multiple of (model_max_length - 2)
-    max_length = max([len(token) for token in prompt_tokens])
+    max_length = max(len(token) for token in prompt_tokens)
 
     max_embeddings_multiples = min(
         max_embeddings_multiples,

@@ -58,8 +58,7 @@ def cat_h(sliced):
         else:
             cat.append(x[:, :, 1:-1, :])
         del x
-    x = torch.cat(cat, dim=2)
-    return x
+    return torch.cat(cat, dim=2)
 
 
 def resblock_forward(_self, num_slices, input_tensor, temb):
@@ -344,11 +343,7 @@ class SlicingEncoder(nn.Module):
             x = x.to(cpu_device)
 
             # ここだけ雰囲気が違うのはCopilotのせい
-            if i == 0:
-                hidden_states = x
-            else:
-                hidden_states = torch.cat([hidden_states, x], dim=2)
-
+            hidden_states = x if i == 0 else torch.cat([hidden_states, x], dim=2)
         hidden_states = hidden_states.to(org_device)
         # print("downsample forward done", hidden_states.shape)
         return hidden_states
@@ -454,7 +449,7 @@ class SlicingDecoder(nn.Module):
         sample = self.mid_block(sample)
 
         # up
-        for i, up_block in enumerate(self.up_blocks):
+        for up_block in self.up_blocks:
             sample = up_block(sample)
 
         # post-process
@@ -616,10 +611,7 @@ class SlicingAutoencoderKL(ModelMixin, ConfigMixin):
         z = self.post_quant_conv(z)
         dec = self.decoder(z)
 
-        if not return_dict:
-            return (dec,)
-
-        return DecoderOutput(sample=dec)
+        return (dec, ) if not return_dict else DecoderOutput(sample=dec)
 
     # これはバッチ方向のスライシング　紛らわしい
     def enable_slicing(self):
@@ -645,10 +637,7 @@ class SlicingAutoencoderKL(ModelMixin, ConfigMixin):
         else:
             decoded = self._decode(z).sample
 
-        if not return_dict:
-            return (decoded,)
-
-        return DecoderOutput(sample=decoded)
+        return (decoded, ) if not return_dict else DecoderOutput(sample=decoded)
 
     def forward(
         self,
@@ -673,7 +662,4 @@ class SlicingAutoencoderKL(ModelMixin, ConfigMixin):
             z = posterior.mode()
         dec = self.decode(z).sample
 
-        if not return_dict:
-            return (dec,)
-
-        return DecoderOutput(sample=dec)
+        return (dec, ) if not return_dict else DecoderOutput(sample=dec)
